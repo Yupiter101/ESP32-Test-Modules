@@ -36,13 +36,9 @@ QMC5883LCompass compass;
 boolean flag_BME_Init = false;
 boolean flag_HMC_Init = false;
 // uint32_t lastMilisBME = 0;
-int i2cAdrArr[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // масив адресів
-uint8_t modulesStatus = 0b00000000; // інформація про скановані модулі. макс 8
+int i2cAdrArr[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // масив I2C адресів
+uint8_t modulesStatus = 0b00000000; // Наявні I2C модулі. макс 8
 
-// #define MPU_Status modulesStatus & (1<<0)
-// #define BME_Status modulesStatus & (1<<1)
-// #define HMC_Status modulesStatus & (1<<2)
-// #define OLED_Status modulesStatus & (1<<3)
 
 #define QMC_Status modulesStatus & (1<<0)
 #define HMC_Status modulesStatus & (1<<1)
@@ -54,8 +50,10 @@ uint8_t modulesStatus = 0b00000000; // інформація про сканов�
 
 
 void setup() {
+
     pinMode(LED_BUILTIN, OUTPUT); // Buzzer pin (2)
     delay(1);
+
     Serial.begin(115200);
     while(!Serial);    // time to get serial running
     Wire.begin(I2C_SDA, I2C_SCL); // 33 32
@@ -129,29 +127,26 @@ void setup() {
       delay(450);
     }
 
-    // compass.init();
-
 
     /* === Initialise HMC5883 sensor == */
-    if(QMC_Status) {
-      Serial.println("QMC5883 detected");
+    if(QMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
+      Serial.println("QMC5883 detected"); 
       // flag_HMC_Init = initHMC();
-      compass.init();
+      compass.init(); // Тут просто ініціалізація
       
     }
-   
 
-    if(HMC_Status) {
+    if(HMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
       Serial.println("HMC5883 detected");
-      flag_HMC_Init = initHMC();
+      flag_HMC_Init = initHMC(); // Тут Вдалося ініціалізувати чи ні
     }
   
     delay(500);
 
     /* === Initialise BME280 sensor === */
-    if(BME_Status) {
+    if(BME_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
       Serial.println("BME280 detected");
-      flag_BME_Init = initBME280();
+      flag_BME_Init = initBME280(); // Тут Вдалося ініціалізувати чи ні
     }
 }
 
@@ -160,7 +155,7 @@ void loop() {
 
 
     // == show_BME280 ==
-    if(flag_BME_Init) {
+    if(flag_BME_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
         Serial.println("Log BME280");
         for(int i=0; i<10; i++) {
             show_BME280_values();
@@ -176,8 +171,8 @@ void loop() {
     Serial.println(); 
 
     // == show_HMC5883 ==
-    if(flag_HMC_Init) {
-        Serial.println("Log (Q)HMC5883");
+    if(flag_HMC_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
+        Serial.println("Log HMC5883");
         for(int i=0; i<10; i++) {
             show_HMC5883_values();
             delay(500);
@@ -187,7 +182,7 @@ void loop() {
     delay(2000);
 
 
-    if(QMC_Status) {
+    if(QMC_Status) { // Тут почати зчитувати значення без попередньої перевірки на ініціалізацію 
       int x, y, z;  
       // Read compass values
       compass.read();
@@ -203,7 +198,7 @@ void loop() {
       Serial.print(y);
       Serial.print(" Z: ");
       Serial.print(z);
-      Serial.println();
+      // Serial.println();
     }
 
     Serial.println();
