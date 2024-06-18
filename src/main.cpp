@@ -10,6 +10,9 @@
         + Додати модуль HMC5883
     - Додати Сканер I2C
     - Додати акселерометр MPU-9250
+      + accelerometr
+      - giro
+      - magnetometr
     - Додати сімкарту
     - Додати роботу з GPS
     - Реалізувати спілкування між двома ESP32 
@@ -32,10 +35,15 @@
 
 #define MPU9250_ADDR 0x68
 QMC5883LCompass compass;
+// MPU - accelerom, giro, magnetom
 MPU9250_WE myMPU9250 = MPU9250_WE(MPU9250_ADDR);
 
 #define I2C_SDA 33
 #define I2C_SCL 32
+
+// Тут готувати роботу з кнопкою
+const uint8_t BUTTON_PIN = 35;  // the number of the pushbutton pin
+bool buttonState = false;
 
 boolean flag_BME_Init = false;
 boolean flag_HMC_Init = false;
@@ -56,6 +64,7 @@ uint8_t modulesStatus = 0b00000000; // Наявні I2C модулі. макс 8
 void setup() {
 
     pinMode(LED_BUILTIN, OUTPUT); // Buzzer pin (2)
+    pinMode(BUTTON_PIN, INPUT_PULLUP); // Btn pin HIGH, wait LOW
 
     Serial.begin(115200);
     while(!Serial);    // time to get serial running
@@ -259,12 +268,20 @@ void setup() {
       //myMPU9250.enableAccAxes(MPU9250_ENABLE_XYZ);
 
     }
+
+
+
+    /* === Initialise MPU9250 sensor Giroscop === */
+        // Дивитися з прикладу бібліотеки
     
 
 }
 
 
 void loop() { 
+
+    // Тут готувати роботу з кнопкою
+    buttonState = digitalRead(BUTTON_PIN);
 
 
     // == show_BME280 ==
