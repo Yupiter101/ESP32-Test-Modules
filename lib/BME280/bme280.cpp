@@ -22,7 +22,7 @@ bool initBME280 (void) {
         return false;
     }
     else {
-        Serial.println("BME280 sensor OK!");
+        Serial.println("BME280 inited");
         return true;
     } 
 }

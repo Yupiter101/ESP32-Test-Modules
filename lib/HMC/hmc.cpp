@@ -12,7 +12,7 @@ bool initHMC (void) {
         return false;
     }
     else {
-        Serial.println("HMC5883 sensor OK!");
+        Serial.println("HMC5883 inited");
         // show_HMC5883_details();
         return true;
     }
