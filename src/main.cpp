@@ -128,15 +128,17 @@ void loop() {
       lastMillis = millis();
       ledState = !ledState;
       digitalWrite(LED_BUILTIN, ledState);
-      blinkInterval = ledState ? 100 : 900;
+      blinkInterval = ledState ? 30 : 970;
     } 
 
-    if(!buttonState && !digitalRead(BUTTON_PIN)) { // Чи натиснута кнопка
-      delay(5);
+    // Чи натиснута кнопка
+    if(!buttonState && !digitalRead(BUTTON_PIN)) { 
+      delay(5);  // Затримка від дребезга
       if(!digitalRead(BUTTON_PIN)) { // Перевірка натискання
         buttonState = true;        // Підняли Флаг натиснутої кнопки
         digitalWrite(LED_BUILTIN, LOW);
         ledState = false;
+        delay(100); // Затримка від подвійного натискання
         blinkInterval = 1000;
                    
         flagStartCheckModules = true;   // Підняли Флаг про дозвіл перевірки модулів
@@ -144,10 +146,9 @@ void loop() {
     }
 
 
-    // Сюди переніс з Setup
+    // Якщо кнопку натиснули то почати перевірку показників модулів (Сюди переніс з Setup)
     if(flagStartCheckModules) { // Якщо є дозвіл перевірки модулів
       flagStartCheckModules = false;
-      // Check modules
 
       /* === I2C scanner == */
       scanningModules();
@@ -167,23 +168,25 @@ void loop() {
     
       delay(100);
 
-
       /* === INIT BME280 sensor barometr === */
       if(BME_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
         Serial.println("BME280 detected");
         flag_BME_Init = initBME280(); // Тут Вдалося ініціалізувати чи ні
 
         if(flag_BME_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
+          // Serial.println("BME280 inited");
           bool flag_BME_checked = check_BME_values();
 
           if(flag_BME_checked) {
             // good
+            Serial.println("BME280 GOOD");
             digitalWrite(LED_BUILTIN, HIGH);
             delay(1000);
             digitalWrite(LED_BUILTIN, LOW);
           }
           else {
             // bed
+            Serial.println("BME280 BED");
             for(int i=0; i<3; i++){
               digitalWrite(LED_BUILTIN, HIGH);
               delay(150);
@@ -198,18 +201,12 @@ void loop() {
       if(MPU_Status) {   // Якщо Є такий I2C адрес то почати ініціалізацію
         innitMPU9250();
       }
+      
     }
 
 
-     
-
 
     // == / CHECK MODULES === 
-
-
-
-
-
 
     // -------------------------------------
 
@@ -304,60 +301,15 @@ void loop() {
       delay(2000); 
     }
 
-    // Serial.println();
+
+  if(buttonState) buttonState = false;
+
 }
 
-// // My test chenges
-// bool MPUcheckChengeVal (void) {
 
 
-//   if(MPU_Status) {
-//       Serial.println("Log MPU9250");
-
-//       for(int i=0; i<10; i++) {
-//         xyzFloat gValue = myMPU9250.getGValues();
-//         xyzFloat gyr = myMPU9250.getGyrValues();
-//         xyzFloat magValue = myMPU9250.getMagValues();
-//         float temp = myMPU9250.getTemperature();
-//         float resultantG = myMPU9250.getResultantG(gValue);
-
-//         Serial.print("Acceleration g (x,y,z): ");
-//         Serial.print(gValue.x);
-//         Serial.print("   ");
-//         Serial.print(gValue.y);
-//         Serial.print("   ");
-//         Serial.print(gValue.z);
-//         Serial.print("   ");
-//         Serial.print("Result g: ");
-//         Serial.println(resultantG);
-
-//         Serial.print("Gyroscope degrees/s: ");
-//         Serial.print(gyr.x);
-//         Serial.print("   ");
-//         Serial.print(gyr.y);
-//         Serial.print("   ");
-//         Serial.println(gyr.z);
-
-//         Serial.print("Magnetometer µTesla: ");
-//         Serial.print(magValue.x);
-//         Serial.print("   ");
-//         Serial.print(magValue.y);
-//         Serial.print("   ");
-//         Serial.println(magValue.z);
-
-//         Serial.print("Temperature in °C: ");
-//         Serial.println(temp);
-//         Serial.println();
-//         delay(1000);
-//       }
-//     delay(2000);
-      
-//     }
 
 
-//   // code
-//   return true;
-// }
 
 
 // === FUNCTIONS ===

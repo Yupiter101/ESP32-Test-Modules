@@ -47,13 +47,20 @@ void show_BME280_values(void) {
 
 bool check_BME_values (void) {
     float altitud_firstVal = bme.readAltitude(SEALEVELPRESSURE_HPA);
-    for(int i=0; i<100; i++) {
+    Serial.print("firstVal: ");
+    Serial.println(altitud_firstVal);
+    for(int i=0; i<10; i++) {
         float altitud_restVal = bme.readAltitude(SEALEVELPRESSURE_HPA);
-        if(altitud_firstVal != altitud_firstVal) {
+
+        Serial.println(altitud_restVal);
+
+        if(altitud_firstVal != altitud_restVal) {
+        Serial.println("return true");
            return true; 
         }
-        delay(20);
-    }     
+        delay(100);
+    }
+    Serial.println("return false");  
     return false;
 }
 
