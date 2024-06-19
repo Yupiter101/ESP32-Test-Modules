@@ -72,6 +72,52 @@ void show_HMC5883_values(void) {
 }
 
 
+bool check_HMC_values (void) {
+    sensors_event_t event; 
+    mag.getEvent(&event);
 
+    bool X_flag = false; //  
+    bool Y_flag = false;
+    bool Z_flag = false;
+    float X_firstVal = event.magnetic.x;
+    float Y_firstVal = event.magnetic.y;
+    float Z_firstVal = event.magnetic.z;
+
+    Serial.print("HMC_firstVal: ");
+    Serial.print(X_firstVal);
+    Serial.print("  ");
+    Serial.print(Y_firstVal);
+    Serial.print("  ");
+    Serial.println(Z_firstVal);
+
+    for(int i=0; i<20; i++) {
+        float X_restVal = event.magnetic.x;
+        float Y_restVal = event.magnetic.y;
+        float Z_restVal = event.magnetic.z;
+
+        Serial.print("HMC_restVal: ");
+        Serial.print(X_restVal);
+        Serial.print("  ");
+        Serial.print(Y_restVal);
+        Serial.print("  ");
+        Serial.println(Z_restVal);
+
+        if(!X_flag && X_restVal != X_restVal) {
+            X_flag = true; 
+        }
+        if(!Y_flag && Y_restVal != Y_restVal) {
+            Y_flag = true; 
+        }
+        if(!Z_flag && Z_restVal != Z_restVal) {
+            Z_flag = true; 
+        }
+
+        if(X_flag && Y_flag && Z_flag) {
+            return true;
+        }
+        delay(100);
+    } 
+    return false;
+}
 
 

@@ -146,6 +146,8 @@ void loop() {
     }
 
 
+
+
     // Якщо кнопку натиснули то почати перевірку показників модулів (Сюди переніс з Setup)
     if(flagStartCheckModules) { // Якщо є дозвіл перевірки модулів
       flagStartCheckModules = false;
@@ -164,12 +166,35 @@ void loop() {
       if(HMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
         Serial.println("HMC5883 detected");
         flag_HMC_Init = initHMC(); // Тут Вдалося ініціалізувати чи ні
+        if(flag_HMC_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
+
+          bool flag_HMC_checked = check_HMC_values();
+
+          if(flag_HMC_checked) {
+            // good
+            Serial.println("HMC5883 GOOD");
+            digitalWrite(LED_BUILTIN, HIGH);
+            delay(1000);
+            digitalWrite(LED_BUILTIN, LOW);
+          }
+          else {
+            // bed
+            Serial.println("HMC5883 BED");
+            for(int i=0; i<3; i++){
+              digitalWrite(LED_BUILTIN, HIGH);
+              delay(150);
+              digitalWrite(LED_BUILTIN, LOW);
+              delay(150);
+            }
+          }
+        }
       }
     
       delay(100);
 
       /* === INIT BME280 sensor barometr === */
       if(BME_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
+        Serial.println(BME_Status);
         Serial.println("BME280 detected");
         flag_BME_Init = initBME280(); // Тут Вдалося ініціалізувати чи ні
 
@@ -221,85 +246,85 @@ void loop() {
     // }
   
     // == SHOW_HMC5883 ==
-    if(flag_HMC_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
-        Serial.println("Log HMC5883");
-        for(int i=0; i<10; i++) {
-            show_HMC5883_values();
-            delay(500);
-        }
-        delay(2000);
-    }
+    // if(flag_HMC_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
+    //     Serial.println("Log HMC5883");
+    //     for(int i=0; i<10; i++) {
+    //         show_HMC5883_values();
+    //         delay(500);
+    //     }
+    //     delay(2000);
+    // }
 
 
-    // == SHOW_QMC5883 ==
-    if(QMC_Status) { // Тут почати зчитувати значення без попередньої перевірки на ініціалізацію
-      Serial.println("Log QMC5883"); 
+    // // == SHOW_QMC5883 ==
+    // if(QMC_Status) { // Тут почати зчитувати значення без попередньої перевірки на ініціалізацію
+    //   Serial.println("Log QMC5883"); 
 
-      for(int i=0; i<10; i++) {
-        int x, y, z;  
-        // Read compass values
-        compass.read();
+    //   for(int i=0; i<10; i++) {
+    //     int x, y, z;  
+    //     // Read compass values
+    //     compass.read();
 
-        // Return XYZ readings
-        x = compass.getX();
-        y = compass.getY();
-        z = compass.getZ();
+    //     // Return XYZ readings
+    //     x = compass.getX();
+    //     y = compass.getY();
+    //     z = compass.getZ();
         
-        Serial.print("X: ");
-        Serial.print(x);
-        Serial.print(" Y: ");
-        Serial.print(y);
-        Serial.print(" Z: ");
-        Serial.println(z);
-        // Serial.println(); 
+    //     Serial.print("X: ");
+    //     Serial.print(x);
+    //     Serial.print(" Y: ");
+    //     Serial.print(y);
+    //     Serial.print(" Z: ");
+    //     Serial.println(z);
+    //     // Serial.println(); 
 
-        delay(500); 
-      }
-      Serial.println(); 
-    }
+    //     delay(500); 
+    //   }
+    //   Serial.println(); 
+    // }
 
-    // == SHOW_MPU9250 Accereration ==
-    if(MPU_Status) {
-      Serial.println("Log MPU9250");
+    // // == SHOW_MPU9250 Accereration ==
+    // if(MPU_Status) {
+    //   Serial.println("Log MPU9250");
 
-      for(int i=0; i<10; i++) {
-        xyzFloat gValue = myMPU9250.getGValues();
-        xyzFloat gyr = myMPU9250.getGyrValues();
-        xyzFloat magValue = myMPU9250.getMagValues();
-        float temp = myMPU9250.getTemperature();
-        float resultantG = myMPU9250.getResultantG(gValue);
+    //   for(int i=0; i<10; i++) {
+    //     xyzFloat gValue = myMPU9250.getGValues();
+    //     xyzFloat gyr = myMPU9250.getGyrValues();
+    //     xyzFloat magValue = myMPU9250.getMagValues();
+    //     float temp = myMPU9250.getTemperature();
+    //     float resultantG = myMPU9250.getResultantG(gValue);
 
-        Serial.print("Acceleration g (x,y,z): ");
-        Serial.print(gValue.x);
-        Serial.print("   ");
-        Serial.print(gValue.y);
-        Serial.print("   ");
-        Serial.print(gValue.z);
-        Serial.print("   ");
-        Serial.print("Result g: ");
-        Serial.println(resultantG);
+    //     Serial.print("Acceleration g (x,y,z): ");
+    //     Serial.print(gValue.x);
+    //     Serial.print("   ");
+    //     Serial.print(gValue.y);
+    //     Serial.print("   ");
+    //     Serial.print(gValue.z);
+    //     Serial.print("   ");
+    //     Serial.print("Result g: ");
+    //     Serial.println(resultantG);
 
-        Serial.print("Gyroscope degrees/s: ");
-        Serial.print(gyr.x);
-        Serial.print("   ");
-        Serial.print(gyr.y);
-        Serial.print("   ");
-        Serial.println(gyr.z);
+    //     Serial.print("Gyroscope degrees/s: ");
+    //     Serial.print(gyr.x);
+    //     Serial.print("   ");
+    //     Serial.print(gyr.y);
+    //     Serial.print("   ");
+    //     Serial.println(gyr.z);
 
-        Serial.print("Magnetometer µTesla: ");
-        Serial.print(magValue.x);
-        Serial.print("   ");
-        Serial.print(magValue.y);
-        Serial.print("   ");
-        Serial.println(magValue.z);
+    //     Serial.print("Magnetometer µTesla: ");
+    //     Serial.print(magValue.x);
+    //     Serial.print("   ");
+    //     Serial.print(magValue.y);
+    //     Serial.print("   ");
+    //     Serial.println(magValue.z);
 
-        Serial.print("Temperature in °C: ");
-        Serial.println(temp);
-        Serial.println();
-        delay(1000);
-      }
-      delay(2000); 
-    }
+    //     Serial.print("Temperature in °C: ");
+    //     Serial.println(temp);
+    //     Serial.println();
+    //     delay(1000);
+    //   }
+    //   delay(2000); 
+    // }
 
 
   if(buttonState) buttonState = false;

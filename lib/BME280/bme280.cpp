@@ -49,18 +49,18 @@ bool check_BME_values (void) {
     float altitud_firstVal = bme.readAltitude(SEALEVELPRESSURE_HPA);
     Serial.print("firstVal: ");
     Serial.println(altitud_firstVal);
-    for(int i=0; i<10; i++) {
+    for(int i=0; i<20; i++) {
         float altitud_restVal = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
         Serial.println(altitud_restVal);
 
         if(altitud_firstVal != altitud_restVal) {
-        Serial.println("return true");
+        // Serial.println("return true");
            return true; 
         }
         delay(100);
     }
-    Serial.println("return false");  
+    // Serial.println("return false");  
     return false;
 }
 
