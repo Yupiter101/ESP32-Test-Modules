@@ -123,6 +123,13 @@ void loop() {
 
     // == / CHECK MODULES === 
     
+    // блінк - режим очікування (нічого не робить)
+    if(!flagStartCheckModules && millis() - lastMillis >= blinkInterval){
+      lastMillis = millis();
+      ledState = !ledState;
+      digitalWrite(LED_BUILTIN, ledState);
+      blinkInterval = ledState ? 100 : 900;
+    } 
 
     if(!buttonState && !digitalRead(BUTTON_PIN)) { // Чи натиснута кнопка
       delay(5);
@@ -194,21 +201,7 @@ void loop() {
     }
 
 
-     // блінк - режим очікування (нічого не робить)
-    if(!flagStartCheckModules && millis() - lastMillis >= blinkInterval){
-      lastMillis = millis();
-      ledState = !ledState;
-      digitalWrite(LED_BUILTIN, ledState);
-      blinkInterval = ledState ? 100 : 900;
-
-      // Serial.print("BLINK "); Serial.println(countBlink);
-      // countBlink += 1;
-      // if(countBlink >= 10) {
-      //   countBlink = 0;
-      //   buttonState = false;
-      //   flagStartCheckModules = false;
-      // }
-    } 
+     
 
 
     // == / CHECK MODULES === 
