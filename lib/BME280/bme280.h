@@ -12,4 +12,5 @@
 
 bool initBME280 (void);
 void show_BME280_values(void);
+bool check_BME_values (void);
 

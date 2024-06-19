@@ -45,5 +45,17 @@ void show_BME280_values(void) {
     // Serial.println();
 }
 
+bool check_BME_values (void) {
+    float altitud_firstVal = bme.readAltitude(SEALEVELPRESSURE_HPA);
+    for(int i=0; i<100; i++) {
+        float altitud_restVal = bme.readAltitude(SEALEVELPRESSURE_HPA);
+        if(altitud_firstVal != altitud_firstVal) {
+           return true; 
+        }
+        delay(20);
+    }     
+    return false;
+}
+
 
 // #endif
