@@ -74,6 +74,10 @@ void innitMPU9250(void);
 void buzzingGoog (void);
 void buzzingBed (void);
 bool check_QMC_values (void);
+bool check_MPU_ACC_values (void);
+bool check_MPU_Giro_values (void);
+bool check_MPU_Temp_values (void);
+
 
 
 
@@ -92,43 +96,11 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT); // Buzzer pin (2)
     pinMode(BUTTON_PIN, INPUT_PULLUP); // Btn pin HIGH, wait LOW
 
-    // -------------------------------
-
-    // /* === I2C scanner == */
-    // scanningModules();
-
-    // /* === INIT HMC5883 sensor magnetometr == */
-    // if(QMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
-    //   Serial.println("QMC5883 detected"); 
-    //   // flag_HMC_Init = initHMC();
-    //   compass.init(); // Тут просто ініціалізація
-    // }
-
-    // /* === INIT QMC5883 sensor magnetometr == */
-    // if(HMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
-    //   Serial.println("HMC5883 detected");
-    //   flag_HMC_Init = initHMC(); // Тут Вдалося ініціалізувати чи ні
-    // }
-  
-    // delay(100);
-
-    // /* === INIT BME280 sensor barometr === */
-    // if(BME_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
-    //   Serial.println("BME280 detected");
-    //   flag_BME_Init = initBME280(); // Тут Вдалося ініціалізувати чи ні
-    // }
-
-    // /* === INIT MPU9250 sensor Accereration Giro Mag Temp === */
-    // if(MPU_Status) {   // Якщо Є такий I2C адрес то почати ініціалізацію
-    //   innitMPU9250();
-    // }
 }
 
 
 void loop() { 
 
-    // == / CHECK MODULES === 
-    
     // === блінк - режим очікування (нічого не робить) ===
     if(!flagStartCheckModules && millis() - lastMillis >= blinkInterval){
       lastMillis = millis();
@@ -170,7 +142,7 @@ void loop() {
         compass.init(); // Тут просто ініціалізація
         Serial.println("QMC5883 checking values...");
 
-        bool flag_QMC_checked = check_QMC_values(); // Нет этого
+        bool flag_QMC_checked = check_QMC_values(); 
         if(flag_QMC_checked) {
             // good
             Serial.println("QMC5883 values GOOD");
@@ -219,10 +191,28 @@ void loop() {
 
 
       /* === INIT MPU9250 sensor Accereration Giro Mag Temp === */
-      // if(MPU_Status) {   // Якщо Є такий I2C адрес то почати ініціалізацію
-      //   innitMPU9250();
-      // }
+      if(MPU_Status) {   // Якщо Є такий I2C адрес то почати ініціалізацію
+        innitMPU9250(); // Тут просто ініціалізація
+        Serial.println(" ");
+        Serial.println("MPU9250 check values:");
 
+        bool flag_Acc = check_MPU_ACC_values(); 
+        bool flag_Giro = check_MPU_Giro_values(); 
+        bool flag_Temp = check_MPU_Temp_values(); 
+
+        if(flag_Acc && flag_Giro && flag_Temp) {
+            // good
+            Serial.println("MPU9250 values GOOD");
+            buzzingGoog();
+        }
+        else {
+            // bed
+            Serial.println("MPU9250 values BED");
+            buzzingBed();
+        }
+        Serial.println(" ");
+      }
+      delay(1000);
 
 
 
@@ -309,7 +299,7 @@ void loop() {
     //   Serial.println(); 
     // }
 
-    // // == SHOW_MPU9250 Accereration ==
+    // // == SHOW_MPU9250 Acc+Giro+Temp ==
     // if(MPU_Status) {
     //   Serial.println("Log MPU9250");
 
@@ -355,8 +345,6 @@ void loop() {
 
   if(buttonState) {
     buttonState = false;
-    // flag_BME_Init = false;      // Обнуляем дані про скановані модулі
-    // flag_HMC_Init = false;      // Обнуляем дані про скановані модулі
     modulesStatus = 0b00000000; // Обнуляем дані про скановані модулі
   }
 
@@ -640,6 +628,150 @@ bool check_QMC_values (void) {
     }
 
     if(X_flag && Y_flag && Z_flag) {
+      return true;
+    }
+    delay(200);
+  }
+  return false;
+}
+
+
+
+
+bool check_MPU_ACC_values (void) {
+  Serial.println("Check Acceleration vall...");
+  bool X_flag = false; //  
+  bool Y_flag = false;
+  bool Z_flag = false;
+
+  xyzFloat gValue = myMPU9250.getGValues();
+  
+  float X_firstVal = gValue.x;
+  float Y_firstVal = gValue.y;
+  float Z_firstVal = gValue.z;
+  Serial.print("First Val: ");
+  Serial.print(X_firstVal, 4);
+  Serial.print("  ");
+  Serial.print(Y_firstVal, 4);
+  Serial.print("  ");
+  Serial.println(Z_firstVal, 4);
+
+  delay(20); // Пауза між зчитуванням
+
+  for(int i=0; i<20; i++) {
+    xyzFloat gValue = myMPU9250.getGValues();
+
+    float X_restVal = gValue.x;
+    float Y_restVal = gValue.y;
+    float Z_restVal = gValue.z;
+
+    Serial.print("Rest Val: ");
+    Serial.print(X_restVal, 4);
+    Serial.print("  ");
+    Serial.print(Y_restVal, 4);
+    Serial.print("  ");
+    Serial.println(Z_restVal, 4);
+
+    if(!X_flag && X_firstVal != X_restVal) {
+      X_flag = true;
+      Serial.println("X - Ok");
+    }
+
+    if(!Y_flag && Y_firstVal != Y_restVal) {
+      Y_flag = true;
+      Serial.println("Y - Ok");
+    }
+
+    if(!Z_flag && Z_firstVal != Z_restVal) {
+      Z_flag = true;
+      Serial.println("Z - Ok");
+    }
+
+    if(X_flag && Y_flag && Z_flag) {
+      return true;
+      // flagNext = true;
+    }
+    delay(200);
+  }
+  return false;
+}
+  
+
+
+bool check_MPU_Giro_values (void) {
+
+  Serial.println("Check Giroscope vall...");
+  bool X_flag = false; //  
+  bool Y_flag = false;
+  bool Z_flag = false;
+
+  xyzFloat gyr = myMPU9250.getGyrValues();
+  
+  float X_firstVal = gyr.x;
+  float Y_firstVal = gyr.y;
+  float Z_firstVal = gyr.z;
+  Serial.print("First Val: ");
+  Serial.print(X_firstVal);
+  Serial.print("  ");
+  Serial.print(Y_firstVal);
+  Serial.print("  ");
+  Serial.println(Z_firstVal);
+
+  delay(20); // Пауза між зчитуванням
+
+  for(int i=0; i<20; i++) {
+    xyzFloat gyr = myMPU9250.getGyrValues();
+
+    float X_restVal = gyr.x;
+    float Y_restVal = gyr.y;
+    float Z_restVal = gyr.z;
+
+    Serial.print("Rest Val: ");
+    Serial.print(X_restVal);
+    Serial.print("  ");
+    Serial.print(Y_restVal);
+    Serial.print("  ");
+    Serial.println(Z_restVal);
+
+    if(!X_flag && X_firstVal != X_restVal) {
+      X_flag = true;
+      Serial.println("X - Ok");
+    }
+
+    if(!Y_flag && Y_firstVal != Y_restVal) {
+      Y_flag = true;
+      Serial.println("Y - Ok");
+    }
+
+    if(!Z_flag && Z_firstVal != Z_restVal) {
+      Z_flag = true;
+      Serial.println("Z - Ok");
+    }
+
+    if(X_flag && Y_flag && Z_flag) {
+      return true;
+      // flagNext = true;
+    }
+    delay(200);
+  }
+  return false;
+}
+
+
+bool check_MPU_Temp_values (void) {
+  Serial.println("Check Temperature vall..."); 
+  float firstVal = myMPU9250.getTemperature();
+  Serial.print("First Val: ");
+  Serial.println(firstVal);
+
+  delay(20); // Пауза між зчитуванням
+
+  for(int i=0; i<20; i++) {
+    float restVal = myMPU9250.getTemperature();
+    Serial.print("Rest Val: ");
+    Serial.println(restVal);
+
+    if(firstVal != restVal) {
       return true;
     }
     delay(200);
