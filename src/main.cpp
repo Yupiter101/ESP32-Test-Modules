@@ -32,25 +32,35 @@
 #include "bme280.h"
 #include "hmc.h"
 
-
-QMC5883LCompass compass;
-// MPU - accelerom, giro, magnetom
+// Magnetometer-compas
+QMC5883LCompass compass;  
+// MPU9250 - accelerom, giro
 #define MPU9250_ADDR 0x68
 MPU9250_WE myMPU9250 = MPU9250_WE(MPU9250_ADDR);
 
+// == Change I2C pins ==
 #define I2C_SDA 33
 #define I2C_SCL 32
+
+#define LED_RED 15
+#define LED_GREEN 25
 
 // Тут готувати роботу з кнопкою
 const uint8_t BUTTON_PIN = 35;  // the number of the pushbutton pin
 bool buttonState = false;
+uint32_t lastMillis = 0;
+bool flagStartCheckModules = false;
+int countBlink = 0;
+uint16_t blinkInterval = 1000;
+bool ledState = false;
 
-boolean flag_BME_Init = false;
-boolean flag_HMC_Init = false;
-// uint32_t lastMilisBME = 0;
+// --------------------------
+
+// boolean flag_BME_Init = false;
+// boolean flag_HMC_Init = false;
+
 int i2cAdrArr[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // масив I2C адресів
 uint8_t modulesStatus = 0b00000000; // Наявні I2C модулі. макс 8
-
 
 #define QMC_Status modulesStatus & (1<<0)
 #define HMC_Status modulesStatus & (1<<1)
@@ -61,19 +71,205 @@ uint8_t modulesStatus = 0b00000000; // Наявні I2C модулі. макс 8
 
 
 
+// Прототипи функцій. Винести в окремий файл
+void scanningModules (void);
+void innitMPU9250(void);
+void buzzingGoog (void);
+void buzzingBed (void);
+bool check_QMC_values (void);
+bool check_MPU_ACC_values (void);
+bool check_MPU_Giro_values (void);
+bool check_MPU_Temp_values (void);
+
+
+
+
+
+
 void setup() {
 
+    /* == SERIAL == */
     Serial.begin(115200);
     while(!Serial);    // time to get serial running
+
+    /* == WIRE == */
     Wire.begin(I2C_SDA, I2C_SCL); // 33 32
 
+    /* == PINS IN-OUT == */
     pinMode(LED_BUILTIN, OUTPUT); // Buzzer pin (2)
+    pinMode(LED_RED, OUTPUT); // 
+    pinMode(LED_GREEN, OUTPUT); // 
     pinMode(BUTTON_PIN, INPUT_PULLUP); // Btn pin HIGH, wait LOW
 
-    /* === I2C scanner == */
-    byte error, address; //variable for error and I2C address
+}
+
+
+void loop() { 
+
+    // === блінк - режим очікування (нічого не робить) ===
+    if(!flagStartCheckModules && millis() - lastMillis >= blinkInterval){
+      lastMillis = millis();
+      ledState = !ledState;
+      digitalWrite(LED_BUILTIN, ledState);
+      blinkInterval = ledState ? 30 : 970;
+    } 
+
+    // === Чи натиснута кнопка ===
+    if(!buttonState && !digitalRead(BUTTON_PIN)) { 
+      delay(5);  // Затримка від дребезга
+      if(!digitalRead(BUTTON_PIN)) { // Перевірка натискання
+        buttonState = true;        // Підняли Флаг натиснутої кнопки
+        digitalWrite(LED_BUILTIN, LOW);
+        ledState = false;
+        delay(100); // Затримка від подвійного натискання
+        blinkInterval = 1000;
+                   
+        flagStartCheckModules = true;   // Підняли Флаг про дозвіл перевірки модулів
+      }
+    }
+
+
+
+
+    // === Якщо кнопку натиснули то почати перевірку показників модулів 
+    if(flagStartCheckModules) { // Якщо є дозвіл перевірки модулів
+      flagStartCheckModules = false;
+      bool flag_BME_Init = false;
+      bool flag_HMC_Init = false;
+
+      /* === I2C scanner == */
+      scanningModules();
+
+
+
+      /* === INIT QMC5883 sensor magnetometr == */
+      if(QMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
+        compass.init(); // Тут просто ініціалізація
+        Serial.println("QMC5883 checking values...");
+
+        bool flag_QMC_checked = check_QMC_values(); 
+        if(flag_QMC_checked) {
+            // good
+            Serial.println("QMC5883 values GOOD");
+            buzzingGoog();
+        }
+        else {
+            // bed
+            Serial.println("QMC5883 values BED");
+            buzzingBed();
+        }
+        Serial.println(" ");
+      }
+
+      delay(1000);
+        
+
+
+      /* === INIT HMC5883 sensor magnetometr == */
+      if(HMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
+        flag_HMC_Init = initHMC(); // Тут Вдалося ініціалізувати чи ні
+        if(flag_HMC_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
+          Serial.println("HMC5883 checking values...");
+          bool flag_HMC_checked = check_HMC_values();
+
+          if(flag_HMC_checked) {
+            // good
+            Serial.println("HMC5883 values GOOD");
+            buzzingGoog();
+          }
+          else {
+            // bed
+            Serial.println("HMC5883 values BED");
+            buzzingBed();
+          }
+        }
+        else {
+          // bed
+          Serial.println("HMC5883 values BED");
+          buzzingBed();
+        }
+        Serial.println(" ");
+      }
+
+      delay(1000);
+
+
+
+      /* === INIT MPU9250 sensor Accereration Giro Mag Temp === */
+      if(MPU_Status) {   // Якщо Є такий I2C адрес то почати ініціалізацію
+        innitMPU9250(); // Тут просто ініціалізація
+        Serial.println(" ");
+        Serial.println("MPU9250 check values:");
+
+        bool flag_Acc = check_MPU_ACC_values(); 
+        bool flag_Giro = check_MPU_Giro_values(); 
+        bool flag_Temp = check_MPU_Temp_values(); 
+
+        if(flag_Acc && flag_Giro && flag_Temp) {
+            // good
+            Serial.println("MPU9250 values GOOD");
+            buzzingGoog();
+        }
+        else {
+            // bed
+            Serial.println("MPU9250 values BED");
+            buzzingBed();
+        }
+        Serial.println(" ");
+      }
+      delay(1000);
+
+
+
+      /* === INIT BME280 sensor barometr === */
+      if(BME_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
+        flag_BME_Init = initBME280(); // Тут Вдалося ініціалізувати чи ні
+        if(flag_BME_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
+          Serial.println("BME280 checking values...");
+          bool flag_BME_checked = check_BME_values();
+
+          if(flag_BME_checked) {
+            // good
+            Serial.println("BME280 values GOOD");
+            buzzingGoog();
+          }
+          else {
+            // bed
+            Serial.println("BME280 values BED");
+            buzzingBed();
+          }
+        }
+        else {
+          // bed
+          Serial.println("BME280 values BED");
+          buzzingBed();
+        }
+        Serial.println(" ");
+      }
+      delay(1000);
+    }
+
+
+  if(buttonState) {
+    buttonState = false;
+    modulesStatus = 0b00000000; // Обнуляем дані про скановані модулі
+  }
+
+}
+
+
+
+
+
+
+
+// === FUNCTIONS ===
+
+/* === I2C scanner == */
+void scanningModules (void) {
+  byte error, address; //variable for error and I2C address
     int nDevices = 0;
-    Serial.println("Scanning...");
+    Serial.println("\nScanning...");
 
     for (address = 1; address < 127; address++ )
     {
@@ -130,41 +326,17 @@ void setup() {
     else
       Serial.println("I2C done\n");
 
-    while(!nDevices){
-      digitalWrite(LED_BUILTIN, HIGH);
-      delay(50); 
-      digitalWrite(LED_BUILTIN, LOW);
-      delay(450);
-    }
-    /* === End I2C scanner == */
+    // while(!nDevices){
+    //   digitalWrite(LED_BUILTIN, HIGH);
+    //   delay(50); 
+    //   digitalWrite(LED_BUILTIN, LOW);
+    //   delay(450);
+    // }
+}
 
-
-
-    /* === Initialise HMC5883 sensor == */
-    if(QMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
-      Serial.println("QMC5883 detected"); 
-      // flag_HMC_Init = initHMC();
-      compass.init(); // Тут просто ініціалізація
-    }
-
-    /* === Initialise QMC5883 sensor == */
-    if(HMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
-      Serial.println("HMC5883 detected");
-      flag_HMC_Init = initHMC(); // Тут Вдалося ініціалізувати чи ні
-    }
-  
-    delay(500);
-
-    /* === Initialise BME280 sensor === */
-    if(BME_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
-      Serial.println("BME280 detected");
-      flag_BME_Init = initBME280(); // Тут Вдалося ініціалізувати чи ні
-    }
-
-    /* === Initialise MPU9250 sensor Accereration=== */
-    if(MPU_Status) {   // Якщо Є такий I2C адрес то почати ініціалізацію
-      
-      if(!myMPU9250.init()){
+/* === Initialise MPU9250 sensor All data === */
+void innitMPU9250(void) {
+  if(!myMPU9250.init()){
         Serial.println("MPU9250 does not respond");
       }
       else{
@@ -293,123 +465,325 @@ void setup() {
       */
       myMPU9250.setMagOpMode(AK8963_CONT_MODE_100HZ);
       delay(200);
-      
+}
 
+
+// Buzzer sound module is good 
+void buzzingGoog (void) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(LED_GREEN, HIGH);
+    delay(1000);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(2000);
+    digitalWrite(LED_GREEN, LOW);
+}
+   
+// Buzzer sound module is bed  
+void buzzingBed (void) {
+    digitalWrite(LED_RED, HIGH);
+    for(int i=0; i<3; i++){
+        digitalWrite(LED_BUILTIN, HIGH);
+        delay(150);
+        digitalWrite(LED_BUILTIN, LOW);
+        delay(150);
+    }
+    delay(2000);
+    digitalWrite(LED_RED, LOW);
+}
+
+
+
+bool check_QMC_values (void) {
+ 
+  bool X_flag = false; //  
+  bool Y_flag = false;
+  bool Z_flag = false;
+
+  compass.read();
+  int X_firstVal = compass.getX();
+  int Y_firstVal = compass.getY();
+  int Z_firstVal = compass.getZ();
+
+  Serial.print("First Val: ");
+  Serial.print(X_firstVal);
+  Serial.print("  ");
+  Serial.print(Y_firstVal);
+  Serial.print("  ");
+  Serial.println(Z_firstVal);
+  delay(20); // Пауза між зчитуванням
+
+  for(int i=0; i<20; i++) {
+    compass.read();
+    int X_restVal = compass.getX();
+    int Y_restVal = compass.getY();
+    int Z_restVal = compass.getZ();
+
+    Serial.print("Rest Val: ");
+    Serial.print(X_restVal);
+    Serial.print("  ");
+    Serial.print(Y_restVal);
+    Serial.print("  ");
+    Serial.println(Z_restVal);
+
+    if(!X_flag && X_firstVal != X_restVal) {
+      X_flag = true;
+      Serial.println("X - Ok");
     }
 
+    if(!Y_flag && Y_firstVal != Y_restVal) {
+      Y_flag = true;
+      Serial.println("Y - Ok");
+    }
+
+    if(!Z_flag && Z_firstVal != Z_restVal) {
+      Z_flag = true;
+      Serial.println("Z - Ok");
+    }
+
+    if(X_flag && Y_flag && Z_flag) {
+      return true;
+    }
+    delay(200);
+  }
+  return false;
+}
+
+
+
+
+bool check_MPU_ACC_values (void) {
+  Serial.println("Check Acceleration vall...");
+  bool X_flag = false; //  
+  bool Y_flag = false;
+  bool Z_flag = false;
+
+  xyzFloat gValue = myMPU9250.getGValues();
+  
+  float X_firstVal = gValue.x;
+  float Y_firstVal = gValue.y;
+  float Z_firstVal = gValue.z;
+  Serial.print("First Val: ");
+  Serial.print(X_firstVal, 4);
+  Serial.print("  ");
+  Serial.print(Y_firstVal, 4);
+  Serial.print("  ");
+  Serial.println(Z_firstVal, 4);
+
+  delay(20); // Пауза між зчитуванням
+
+  for(int i=0; i<20; i++) {
+    xyzFloat gValue = myMPU9250.getGValues();
+
+    float X_restVal = gValue.x;
+    float Y_restVal = gValue.y;
+    float Z_restVal = gValue.z;
+
+    Serial.print("Rest Val: ");
+    Serial.print(X_restVal, 4);
+    Serial.print("  ");
+    Serial.print(Y_restVal, 4);
+    Serial.print("  ");
+    Serial.println(Z_restVal, 4);
+
+    if(!X_flag && X_firstVal != X_restVal) {
+      X_flag = true;
+      Serial.println("X - Ok");
+    }
+
+    if(!Y_flag && Y_firstVal != Y_restVal) {
+      Y_flag = true;
+      Serial.println("Y - Ok");
+    }
+
+    if(!Z_flag && Z_firstVal != Z_restVal) {
+      Z_flag = true;
+      Serial.println("Z - Ok");
+    }
+
+    if(X_flag && Y_flag && Z_flag) {
+      return true;
+      // flagNext = true;
+    }
+    delay(200);
+  }
+  return false;
+}
   
 
+
+bool check_MPU_Giro_values (void) {
+
+  Serial.println("Check Giroscope vall...");
+  bool X_flag = false; //  
+  bool Y_flag = false;
+  bool Z_flag = false;
+
+  xyzFloat gyr = myMPU9250.getGyrValues();
+  
+  float X_firstVal = gyr.x;
+  float Y_firstVal = gyr.y;
+  float Z_firstVal = gyr.z;
+  Serial.print("First Val: ");
+  Serial.print(X_firstVal);
+  Serial.print("  ");
+  Serial.print(Y_firstVal);
+  Serial.print("  ");
+  Serial.println(Z_firstVal);
+
+  delay(20); // Пауза між зчитуванням
+
+  for(int i=0; i<20; i++) {
+    xyzFloat gyr = myMPU9250.getGyrValues();
+
+    float X_restVal = gyr.x;
+    float Y_restVal = gyr.y;
+    float Z_restVal = gyr.z;
+
+    Serial.print("Rest Val: ");
+    Serial.print(X_restVal);
+    Serial.print("  ");
+    Serial.print(Y_restVal);
+    Serial.print("  ");
+    Serial.println(Z_restVal);
+
+    if(!X_flag && X_firstVal != X_restVal) {
+      X_flag = true;
+      Serial.println("X - Ok");
+    }
+
+    if(!Y_flag && Y_firstVal != Y_restVal) {
+      Y_flag = true;
+      Serial.println("Y - Ok");
+    }
+
+    if(!Z_flag && Z_firstVal != Z_restVal) {
+      Z_flag = true;
+      Serial.println("Z - Ok");
+    }
+
+    if(X_flag && Y_flag && Z_flag) {
+      return true;
+      // flagNext = true;
+    }
+    delay(200);
+  }
+  return false;
 }
 
 
-void loop() { 
+bool check_MPU_Temp_values (void) {
+  Serial.println("Check Temperature vall..."); 
+  float firstVal = myMPU9250.getTemperature();
+  Serial.print("First Val: ");
+  Serial.println(firstVal);
 
-    // Тут готувати роботу з кнопкою
-    // buttonState = digitalRead(BUTTON_PIN);
+  delay(20); // Пауза між зчитуванням
 
+  for(int i=0; i<20; i++) {
+    float restVal = myMPU9250.getTemperature();
+    Serial.print("Rest Val: ");
+    Serial.println(restVal);
 
-    // == show_BME280 ==
-    if(flag_BME_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
-        Serial.println("Log BME280");
-        for(int i=0; i<10; i++) {
-            show_BME280_values();
-            delay(500);
-        } 
+    if(firstVal != restVal) {
+      return true;
     }
-    delay(2000);
+    delay(200);
+  }
+  return false;
+}
 
-    // if(millis() - lastMilisBME >= 1000){
-    //   lastMilisBME = millis();
+
+
+
+// -------------------------------------
+
+    // == SHOW_BME280 ==
+    // if(flag_BME_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
+    //     Serial.println("Log BME280");
+    //     for(int i=0; i<10; i++) {
+    //         show_BME280_values();
+    //         delay(500);
+    //     }
+    //     delay(2000);
+    // }
+  
+    // == SHOW_HMC5883 ==
+    // if(flag_HMC_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
+    //     Serial.println("Log HMC5883");
+    //     for(int i=0; i<10; i++) {
+    //         show_HMC5883_values();
+    //         delay(500);
+    //     }
+    //     delay(2000);
     // }
 
-    Serial.println(); 
 
-    // == show_HMC5883 ==
-    if(flag_HMC_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
-        Serial.println("Log HMC5883");
-        for(int i=0; i<10; i++) {
-            show_HMC5883_values();
-            delay(500);
-        } 
-    }
+    // // == SHOW_QMC5883 ==
+    // if(QMC_Status) { // Тут почати зчитувати значення без попередньої перевірки на ініціалізацію
+    //   Serial.println("Log QMC5883"); 
 
-    delay(2000);
+    //   for(int i=0; i<10; i++) {
+    //     int x, y, z;  
+    //     // Read compass values
+    //     compass.read();
 
-    // == show_QMC5883 ==
-    if(QMC_Status) { // Тут почати зчитувати значення без попередньої перевірки на ініціалізацію
-      Serial.println("Log QMC5883"); 
-
-      for(int i=0; i<10; i++) {
-        int x, y, z;  
-        // Read compass values
-        compass.read();
-
-        // Return XYZ readings
-        x = compass.getX();
-        y = compass.getY();
-        z = compass.getZ();
+    //     // Return XYZ readings
+    //     x = compass.getX();
+    //     y = compass.getY();
+    //     z = compass.getZ();
         
-        Serial.print("X: ");
-        Serial.print(x);
-        Serial.print(" Y: ");
-        Serial.print(y);
-        Serial.print(" Z: ");
-        Serial.println(z);
-        // Serial.println(); 
+    //     Serial.print("X: ");
+    //     Serial.print(x);
+    //     Serial.print(" Y: ");
+    //     Serial.print(y);
+    //     Serial.print(" Z: ");
+    //     Serial.println(z);
+    //     // Serial.println(); 
 
-        delay(500); 
-      }
-    Serial.println(); 
-    delay(2000);
+    //     delay(500); 
+    //   }
+    //   Serial.println(); 
+    // }
 
-    }
+    // // == SHOW_MPU9250 Acc+Giro+Temp ==
+    // if(MPU_Status) {
+    //   Serial.println("Log MPU9250");
 
-    // == show_MPU9250 Accereration ==
-    if(MPU_Status) {
-      Serial.println("Log MPU9250");
+    //   for(int i=0; i<10; i++) {
+    //     xyzFloat gValue = myMPU9250.getGValues();
+    //     xyzFloat gyr = myMPU9250.getGyrValues();
+    //     xyzFloat magValue = myMPU9250.getMagValues();
+    //     float temp = myMPU9250.getTemperature();
+    //     float resultantG = myMPU9250.getResultantG(gValue);
 
-      for(int i=0; i<10; i++) {
-        xyzFloat gValue = myMPU9250.getGValues();
-        xyzFloat gyr = myMPU9250.getGyrValues();
-        xyzFloat magValue = myMPU9250.getMagValues();
-        float temp = myMPU9250.getTemperature();
-        float resultantG = myMPU9250.getResultantG(gValue);
+    //     Serial.print("Acceleration g (x,y,z): ");
+    //     Serial.print(gValue.x);
+    //     Serial.print("   ");
+    //     Serial.print(gValue.y);
+    //     Serial.print("   ");
+    //     Serial.print(gValue.z);
+    //     Serial.print("   ");
+    //     Serial.print("Result g: ");
+    //     Serial.println(resultantG);
 
-        Serial.print("Acceleration g (x,y,z): ");
-        Serial.print(gValue.x);
-        Serial.print("   ");
-        Serial.print(gValue.y);
-        Serial.print("   ");
-        Serial.print(gValue.z);
-        Serial.print("   ");
-        Serial.print("Result g: ");
-        Serial.println(resultantG);
+    //     Serial.print("Gyroscope degrees/s: ");
+    //     Serial.print(gyr.x);
+    //     Serial.print("   ");
+    //     Serial.print(gyr.y);
+    //     Serial.print("   ");
+    //     Serial.println(gyr.z);
 
-        Serial.print("Gyroscope degrees/s: ");
-        Serial.print(gyr.x);
-        Serial.print("   ");
-        Serial.print(gyr.y);
-        Serial.print("   ");
-        Serial.println(gyr.z);
+    //     Serial.print("Magnetometer µTesla: ");
+    //     Serial.print(magValue.x);
+    //     Serial.print("   ");
+    //     Serial.print(magValue.y);
+    //     Serial.print("   ");
+    //     Serial.println(magValue.z);
 
-        Serial.print("Magnetometer µTesla: ");
-        Serial.print(magValue.x);
-        Serial.print("   ");
-        Serial.print(magValue.y);
-        Serial.print("   ");
-        Serial.println(magValue.z);
-
-        Serial.print("Temperature in °C: ");
-        Serial.println(temp);
-        Serial.println();
-        delay(1000);
-      }
-    delay(2000);
-      
-    }
-
-    Serial.println();
-}
-
-
-
+    //     Serial.print("Temperature in °C: ");
+    //     Serial.println(temp);
+    //     Serial.println();
+    //     delay(1000);
+    //   }
+    //   delay(2000); 
+    // }

@@ -72,6 +72,57 @@ void show_HMC5883_values(void) {
 }
 
 
+bool check_HMC_values (void) {
+    sensors_event_t event; 
+    mag.getEvent(&event);
 
+    bool X_flag = false; //  
+    bool Y_flag = false;
+    bool Z_flag = false;
+    float X_firstVal = event.magnetic.x;
+    float Y_firstVal = event.magnetic.y;
+    float Z_firstVal = event.magnetic.z;
+
+    Serial.print("First Val: ");
+    Serial.print(X_firstVal);
+    Serial.print("  ");
+    Serial.print(Y_firstVal);
+    Serial.print("  ");
+    Serial.println(Z_firstVal);
+    delay(20); // Пауза між зчитуванням
+    for(int i=0; i<20; i++) {
+        sensors_event_t event; 
+        mag.getEvent(&event);
+        float X_restVal = event.magnetic.x;
+        float Y_restVal = event.magnetic.y;
+        float Z_restVal = event.magnetic.z;
+
+        Serial.print("Rest Val: ");
+        Serial.print(X_restVal);
+        Serial.print("  ");
+        Serial.print(Y_restVal);
+        Serial.print("  ");
+        Serial.println(Z_restVal);
+
+        if(!X_flag && X_firstVal != X_restVal) {
+            X_flag = true;
+            Serial.println("X - Ok");
+        }
+        if(!Y_flag && Y_firstVal != Y_restVal) {
+            Y_flag = true;
+            Serial.println("Y - Ok");
+        }
+        if(!Z_flag && Z_firstVal != Z_restVal) {
+            Z_flag = true;
+            Serial.println("Z - Ok");
+        }
+
+        if(X_flag && Y_flag && Z_flag) {
+            return true;
+        }
+        delay(200);
+    } 
+    return false;
+}
 
 
