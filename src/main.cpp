@@ -4,37 +4,34 @@
     - Замінити delay() на millis()
         + Винести кожний модуль в окремий файл
         + Розбити окремі файли на .h та .cpp
-    - Слідкувати за змінами величин від модулів. Якщо ні то помилка
-    - Додати звукові сигнали (що усе ок)
+        + Слідкувати за змінами величин від модулів. Якщо ні то помилка
+        + Додати звукові сигнали (що усе ок)
         + Додати модуль BME280
         + Додати модуль HMC5883
-    - Додати Сканер I2C
-    - Додати акселерометр MPU-9250
-      + accelerometr
-      - giro
-      - magnetometr
+        + Додати Сканер I2C
+        + Додати акселерометр MPU-9250
     - Додати сімкарту
     - Додати роботу з GPS
     - Реалізувати спілкування між двома ESP32 
         + Залить на GIT
-    - Device at address HMC5886 MPU9250  BME280  OLED-0.96
-    - Device at address  0x1E    0x68     0x76     0x3C
-    - Device at analog   0x0D    0x69     ----     0x3D
-    - Device at dex     30(13)    104     118        60
+
+     Device at address HMC5886 MPU9250  BME280  OLED-0.96
+     Device at address  0x1E    0x68     0x76     0x3C
+     Device at analog   0x0D    0x69     ----     0x3D
+     Device at dex     30(13)    104     118        60
 */
 
 
 #include <Arduino.h>
 // #include <Wire.h>
-
 #include <MPU9250_WE.h>
 #include <QMC5883LCompass.h>
 #include "bme280.h"
 #include "hmc.h"
 
-// Magnetometer-compas
+// === Magnetometer-compas
 QMC5883LCompass compass;  
-// MPU9250 - accelerom, giro
+// === Accelerom, giro MPU9250
 #define MPU9250_ADDR 0x68
 MPU9250_WE myMPU9250 = MPU9250_WE(MPU9250_ADDR);
 
@@ -50,8 +47,8 @@ const uint8_t BUTTON_PIN = 35;  // the number of the pushbutton pin
 bool buttonState = false;
 uint32_t lastMillis = 0;
 bool flagStartCheckModules = false;
-int countBlink = 0;
-uint16_t blinkInterval = 1000;
+// int countBlink = 0;
+uint16_t blinkInterval = 1000;  // 1s
 bool ledState = false;
 
 // --------------------------
