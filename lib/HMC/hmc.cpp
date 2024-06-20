@@ -83,39 +83,44 @@ bool check_HMC_values (void) {
     float Y_firstVal = event.magnetic.y;
     float Z_firstVal = event.magnetic.z;
 
-    Serial.print("HMC_firstVal: ");
+    Serial.print("First Val: ");
     Serial.print(X_firstVal);
     Serial.print("  ");
     Serial.print(Y_firstVal);
     Serial.print("  ");
     Serial.println(Z_firstVal);
-
+    delay(20); // Пауза між зчитуванням
     for(int i=0; i<20; i++) {
+        sensors_event_t event; 
+        mag.getEvent(&event);
         float X_restVal = event.magnetic.x;
         float Y_restVal = event.magnetic.y;
         float Z_restVal = event.magnetic.z;
 
-        Serial.print("HMC_restVal: ");
+        Serial.print("Rest Val: ");
         Serial.print(X_restVal);
         Serial.print("  ");
         Serial.print(Y_restVal);
         Serial.print("  ");
         Serial.println(Z_restVal);
 
-        if(!X_flag && X_restVal != X_restVal) {
-            X_flag = true; 
+        if(!X_flag && X_firstVal != X_restVal) {
+            X_flag = true;
+            Serial.println("X - Ok");
         }
-        if(!Y_flag && Y_restVal != Y_restVal) {
-            Y_flag = true; 
+        if(!Y_flag && Y_firstVal != Y_restVal) {
+            Y_flag = true;
+            Serial.println("Y - Ok");
         }
-        if(!Z_flag && Z_restVal != Z_restVal) {
-            Z_flag = true; 
+        if(!Z_flag && Z_firstVal != Z_restVal) {
+            Z_flag = true;
+            Serial.println("Z - Ok");
         }
 
         if(X_flag && Y_flag && Z_flag) {
             return true;
         }
-        delay(100);
+        delay(200);
     } 
     return false;
 }

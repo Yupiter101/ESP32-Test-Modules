@@ -34,7 +34,7 @@
 
 // Magnetometer-compas
 QMC5883LCompass compass;  
-// MPU - accelerom, giro
+// MPU9250 - accelerom, giro
 #define MPU9250_ADDR 0x68
 MPU9250_WE myMPU9250 = MPU9250_WE(MPU9250_ADDR);
 
@@ -53,8 +53,8 @@ bool ledState = false;
 
 // --------------------------
 
-boolean flag_BME_Init = false;
-boolean flag_HMC_Init = false;
+// boolean flag_BME_Init = false;
+// boolean flag_HMC_Init = false;
 
 int i2cAdrArr[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // масив I2C адресів
 uint8_t modulesStatus = 0b00000000; // Наявні I2C модулі. макс 8
@@ -71,6 +71,12 @@ uint8_t modulesStatus = 0b00000000; // Наявні I2C модулі. макс 8
 // Прототипи функцій. Винести в окремий файл
 void scanningModules (void);
 void innitMPU9250(void);
+void buzzingGoog (void);
+void buzzingBed (void);
+bool check_QMC_values (void);
+
+
+
 
 
 void setup() {
@@ -123,7 +129,7 @@ void loop() {
 
     // == / CHECK MODULES === 
     
-    // блінк - режим очікування (нічого не робить)
+    // === блінк - режим очікування (нічого не робить) ===
     if(!flagStartCheckModules && millis() - lastMillis >= blinkInterval){
       lastMillis = millis();
       ledState = !ledState;
@@ -131,7 +137,7 @@ void loop() {
       blinkInterval = ledState ? 30 : 970;
     } 
 
-    // Чи натиснута кнопка
+    // === Чи натиснута кнопка ===
     if(!buttonState && !digitalRead(BUTTON_PIN)) { 
       delay(5);  // Затримка від дребезга
       if(!digitalRead(BUTTON_PIN)) { // Перевірка натискання
@@ -148,84 +154,104 @@ void loop() {
 
 
 
-    // Якщо кнопку натиснули то почати перевірку показників модулів (Сюди переніс з Setup)
+    // === Якщо кнопку натиснули то почати перевірку показників модулів 
     if(flagStartCheckModules) { // Якщо є дозвіл перевірки модулів
       flagStartCheckModules = false;
+      bool flag_BME_Init = false;
+      bool flag_HMC_Init = false;
 
       /* === I2C scanner == */
       scanningModules();
 
+
+
       /* === INIT QMC5883 sensor magnetometr == */
       if(QMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
-        Serial.println("QMC5883 detected"); 
-        // flag_HMC_Init = initHMC();
         compass.init(); // Тут просто ініціалізація
+        Serial.println("QMC5883 checking values...");
+
+        bool flag_QMC_checked = check_QMC_values(); // Нет этого
+        if(flag_QMC_checked) {
+            // good
+            Serial.println("QMC5883 values GOOD");
+            buzzingGoog();
+        }
+        else {
+            // bed
+            Serial.println("QMC5883 values BED");
+            buzzingBed();
+        }
+        Serial.println(" ");
       }
+
+      delay(1000);
+        
+
 
       /* === INIT HMC5883 sensor magnetometr == */
       if(HMC_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
-        Serial.println("HMC5883 detected");
         flag_HMC_Init = initHMC(); // Тут Вдалося ініціалізувати чи ні
         if(flag_HMC_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
-
+          Serial.println("HMC5883 checking values...");
           bool flag_HMC_checked = check_HMC_values();
 
           if(flag_HMC_checked) {
             // good
-            Serial.println("HMC5883 GOOD");
-            digitalWrite(LED_BUILTIN, HIGH);
-            delay(1000);
-            digitalWrite(LED_BUILTIN, LOW);
+            Serial.println("HMC5883 values GOOD");
+            buzzingGoog();
           }
           else {
             // bed
-            Serial.println("HMC5883 BED");
-            for(int i=0; i<3; i++){
-              digitalWrite(LED_BUILTIN, HIGH);
-              delay(150);
-              digitalWrite(LED_BUILTIN, LOW);
-              delay(150);
-            }
+            Serial.println("HMC5883 values BED");
+            buzzingBed();
           }
         }
+        else {
+          // bed
+          Serial.println("HMC5883 values BED");
+          buzzingBed();
+        }
+        Serial.println(" ");
       }
-    
-      delay(100);
+
+      delay(1000);
+
+
+
+      /* === INIT MPU9250 sensor Accereration Giro Mag Temp === */
+      // if(MPU_Status) {   // Якщо Є такий I2C адрес то почати ініціалізацію
+      //   innitMPU9250();
+      // }
+
+
+
 
       /* === INIT BME280 sensor barometr === */
       if(BME_Status) {  // Якщо Є такий I2C адрес то почати ініціалізацію
-        Serial.println(BME_Status);
-        Serial.println("BME280 detected");
         flag_BME_Init = initBME280(); // Тут Вдалося ініціалізувати чи ні
-
         if(flag_BME_Init) {  // Якщо вдалося ініціалізувати то почати зчитувати значення
-          // Serial.println("BME280 inited");
+          Serial.println("BME280 checking values...");
           bool flag_BME_checked = check_BME_values();
 
           if(flag_BME_checked) {
             // good
-            Serial.println("BME280 GOOD");
-            digitalWrite(LED_BUILTIN, HIGH);
-            delay(1000);
-            digitalWrite(LED_BUILTIN, LOW);
+            Serial.println("BME280 values GOOD");
+            buzzingGoog();
           }
           else {
             // bed
-            Serial.println("BME280 BED");
-            for(int i=0; i<3; i++){
-              digitalWrite(LED_BUILTIN, HIGH);
-              delay(150);
-              digitalWrite(LED_BUILTIN, LOW);
-              delay(150);
-            }
+            Serial.println("BME280 values BED");
+            buzzingBed();
           }
         }
+        else {
+          // bed
+          Serial.println("BME280 values BED");
+          buzzingBed();
+        }
+        Serial.println(" ");
       }
-
-      /* === INIT MPU9250 sensor Accereration Giro Mag Temp === */
-      if(MPU_Status) {   // Якщо Є такий I2C адрес то почати ініціалізацію
-        innitMPU9250();
-      }
+      delay(1000);
       
     }
 
@@ -327,7 +353,12 @@ void loop() {
     // }
 
 
-  if(buttonState) buttonState = false;
+  if(buttonState) {
+    buttonState = false;
+    // flag_BME_Init = false;      // Обнуляем дані про скановані модулі
+    // flag_HMC_Init = false;      // Обнуляем дані про скановані модулі
+    modulesStatus = 0b00000000; // Обнуляем дані про скановані модулі
+  }
 
 }
 
@@ -343,7 +374,7 @@ void loop() {
 void scanningModules (void) {
   byte error, address; //variable for error and I2C address
     int nDevices = 0;
-    Serial.println("Scanning...");
+    Serial.println("\nScanning...");
 
     for (address = 1; address < 127; address++ )
     {
@@ -539,4 +570,79 @@ void innitMPU9250(void) {
       */
       myMPU9250.setMagOpMode(AK8963_CONT_MODE_100HZ);
       delay(200);
+}
+
+
+// Buzzer sound module is good 
+void buzzingGoog (void) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(1000);
+    digitalWrite(LED_BUILTIN, LOW);
+}
+   
+// Buzzer sound module is bed  
+void buzzingBed (void) {
+    for(int i=0; i<3; i++){
+        digitalWrite(LED_BUILTIN, HIGH);
+        delay(150);
+        digitalWrite(LED_BUILTIN, LOW);
+        delay(150);
+    }
+}
+
+
+
+bool check_QMC_values (void) {
+ 
+  bool X_flag = false; //  
+  bool Y_flag = false;
+  bool Z_flag = false;
+
+  compass.read();
+  int X_firstVal = compass.getX();
+  int Y_firstVal = compass.getY();
+  int Z_firstVal = compass.getZ();
+
+  Serial.print("First Val: ");
+  Serial.print(X_firstVal);
+  Serial.print("  ");
+  Serial.print(Y_firstVal);
+  Serial.print("  ");
+  Serial.println(Z_firstVal);
+  delay(20); // Пауза між зчитуванням
+
+  for(int i=0; i<20; i++) {
+    compass.read();
+    int X_restVal = compass.getX();
+    int Y_restVal = compass.getY();
+    int Z_restVal = compass.getZ();
+
+    Serial.print("Rest Val: ");
+    Serial.print(X_restVal);
+    Serial.print("  ");
+    Serial.print(Y_restVal);
+    Serial.print("  ");
+    Serial.println(Z_restVal);
+
+    if(!X_flag && X_firstVal != X_restVal) {
+      X_flag = true;
+      Serial.println("X - Ok");
+    }
+
+    if(!Y_flag && Y_firstVal != Y_restVal) {
+      Y_flag = true;
+      Serial.println("Y - Ok");
+    }
+
+    if(!Z_flag && Z_firstVal != Z_restVal) {
+      Z_flag = true;
+      Serial.println("Z - Ok");
+    }
+
+    if(X_flag && Y_flag && Z_flag) {
+      return true;
+    }
+    delay(200);
+  }
+  return false;
 }
