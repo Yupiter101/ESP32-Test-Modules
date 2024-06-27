@@ -1,4 +1,5 @@
-/*
+/*  
+    branch clean-code
     Завдання:
     - Додати кнопку з Interrupt перемикання між модулями
     - Замінити delay() на millis()
